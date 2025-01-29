@@ -13,7 +13,6 @@ public class Ride {
     private String destination;
     private int distance;
     private int estimatedTime;
-    private long timestamp;
     private AtomicInteger availableSeats;
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -24,7 +23,6 @@ public class Ride {
         this.destination = destination;
         this.distance = distance;
         this.estimatedTime = estimatedTime;
-        this.timestamp = timestamp;
         this.availableSeats = new AtomicInteger(availableSeats);
     }
 
@@ -91,14 +89,6 @@ public class Ride {
 
     public void setEstimatedTime(int estimatedTime) {
         this.estimatedTime = estimatedTime;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
     }
 
     public AtomicInteger getAvailableSeats() {
