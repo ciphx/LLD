@@ -4,11 +4,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.experiments.snakeAndLadder.model.Game;
 import com.experiments.snakeAndLadder.model.GameState;
@@ -20,10 +22,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 
 import com.experiments.snakeAndLadder.factory.GameFactory;
 import com.experiments.snakeAndLadder.model.Player;
 import com.experiments.snakeAndLadder.repository.PlayerHistoryRepository;
+import com.experiments.snakeAndLadder.factory.DefaultGameFactory;
 
 class GameServiceTest {
     private GameService gameService;
@@ -34,27 +38,38 @@ class GameServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Initialize mocks
         gameFactory = mock(GameFactory.class);
         playerHistory = mock(PlayerHistoryRepository.class);
         mockGame = mock(Game.class);
         mockGameState = mock(GameState.class);
+        
+        // Set up common mock behavior
         when(mockGame.getState()).thenReturn(mockGameState);
+        when(gameFactory.createGame(eq(100), any(), any(), any())).thenReturn(mockGame);
+        
         gameService = new GameService(gameFactory, playerHistory);
     }
 
     @Test
-    void createGame_Success() {
+    void createGame_WithDefaultFactory_Success() {
+        // For this test, we want to use the real factory
+        gameFactory = new DefaultGameFactory();
+        gameService = new GameService(gameFactory, playerHistory);
+        
         Map<Integer, Integer> snakes = new HashMap<>();
         Map<Integer, Integer> ladders = new HashMap<>();
         List<Integer> playerIds = Arrays.asList(1, 2);
         
-        when(gameFactory.createGame(100, snakes, ladders, playerIds))
-            .thenReturn(mockGame);
-        when(mockGame.getId()).thenReturn("game-1");
-
         String gameId = gameService.createGame(100, snakes, ladders, playerIds);
-        assertEquals("game-1", gameId);
+        
+        assertNotNull(gameId);
         verify(playerHistory).recordGame(playerIds, gameId);
+        
+        Game createdGame = gameService.getActiveGames().get(gameId);
+        assertNotNull(createdGame);
+        assertEquals(100, createdGame.getBoard().getSize());
+        assertEquals(2, createdGame.getPlayers().size());
     }
 
     @Test
@@ -67,11 +82,10 @@ class GameServiceTest {
         Map<Integer, Integer> ladders = new HashMap<>();
         List<Integer> playerIds = Arrays.asList(1, 2);
         
-        when(gameFactory.createGame(100, snakes, ladders, playerIds))
-            .thenReturn(mockGame);
-            
-        gameService.createGame(100, snakes, ladders, playerIds);
+        // Create first game
+        String gameId = gameService.createGame(100, snakes, ladders, playerIds);
         
+        // Attempt to create second game
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> 
             gameService.createGame(100, snakes, ladders, playerIds));
         assertEquals("A player is already in an ongoing game", exception.getMessage());
@@ -81,28 +95,41 @@ class GameServiceTest {
     void createGame_ConcurrentAccess_ThreadSafe() throws InterruptedException {
         Map<Integer, Integer> snakes = new HashMap<>();
         Map<Integer, Integer> ladders = new HashMap<>();
-        when(mockGame.getId()).thenReturn("game-1", "game-2");
+        
+        // Set up initial game state
+        when(mockGame.getId()).thenReturn("game-1");
         when(mockGameState.isEnded()).thenReturn(false);
         when(mockGame.getPlayers()).thenReturn(Arrays.asList(new Player(1)));
-        when(gameFactory.createGame(anyInt(), any(), any(), any())).thenReturn(mockGame);
+        
+        // Create initial game with player 1
+        gameService.createGame(100, snakes, ladders, Arrays.asList(1));
 
-        Thread t1 = new Thread(() -> {
-            IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                gameService.createGame(100, snakes, ladders, Arrays.asList(1, 2)));
-            assertEquals("A player is already in an ongoing game", exception.getMessage());
-        });
-        Thread t2 = new Thread(() -> {
-            IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                gameService.createGame(100, snakes, ladders, Arrays.asList(1, 3)));
-            assertEquals("A player is already in an ongoing game", exception.getMessage());
-        });
+        // Counter for number of exceptions caught
+        AtomicInteger exceptionCount = new AtomicInteger(0);
+
+        // Create and run concurrent threads
+        Runnable createGameTask = () -> {
+            try {
+                gameService.createGame(100, snakes, ladders, Arrays.asList(1, 2));
+            } catch (IllegalStateException e) {
+                if (e.getMessage().equals("A player is already in an ongoing game")) {
+                    exceptionCount.incrementAndGet();
+                }
+            }
+        };
+
+        Thread t1 = new Thread(createGameTask);
+        Thread t2 = new Thread(createGameTask);
 
         t1.start();
         t2.start();
         t1.join();
         t2.join();
 
-        verify(gameFactory, times(1)).createGame(anyInt(), any(), any(), any());
+        // Verify that both threads received the exception
+        assertEquals(2, exceptionCount.get());
+        // Verify that only the initial game was created
+        verify(gameFactory, times(1)).createGame(eq(100), any(), any(), any());
     }
 
     @Test
@@ -115,9 +142,6 @@ class GameServiceTest {
         Map<Integer, Integer> ladders = new HashMap<>();
         List<Integer> playerIds = Arrays.asList(1, 2);
         
-        when(gameFactory.createGame(100, snakes, ladders, playerIds))
-            .thenReturn(mockGame);
-            
         String gameId = gameService.createGame(100, snakes, ladders, playerIds);
         assertTrue(gameService.holdDice(gameId, 1));
     }
@@ -150,9 +174,6 @@ class GameServiceTest {
         Map<Integer, Integer> ladders = new HashMap<>();
         List<Integer> playerIds = Arrays.asList(1, 2);
         
-        when(gameFactory.createGame(100, snakes, ladders, playerIds))
-            .thenReturn(mockGame);
-            
         String gameId = gameService.createGame(100, snakes, ladders, playerIds);
         assertFalse(gameService.rollDiceAndMove(gameId, 1));
     }

@@ -3,7 +3,9 @@ package com.experiments.snakeAndLadder.model.board;
 import java.util.Map;
 
 import com.experiments.snakeAndLadder.model.Position;
+import lombok.Getter;
 
+@Getter
 public class Board {
     private final Cell[] cells;
     private final int size;

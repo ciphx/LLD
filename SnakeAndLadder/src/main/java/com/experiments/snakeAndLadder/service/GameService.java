@@ -118,4 +118,8 @@ public class GameService implements GameApplication {
     private void releasePlayerLocks() {
         playerLocks.values().forEach(Lock::unlock);
     }
+
+    Map<String, Game> getActiveGames() {
+        return activeGames;
+    }
 }
