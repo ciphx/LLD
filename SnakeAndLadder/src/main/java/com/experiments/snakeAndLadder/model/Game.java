@@ -35,13 +35,26 @@ public class Game {
 
         // Dice roll and position calculation don't need synchronization
         int diceValue = dice.roll();
-        Position newPosition = board.getNextPosition(player.getPosition(), diceValue);
+        Position currentPosition = player.getPosition();
+        Position newPosition = board.getNextPosition(currentPosition, diceValue);
 
         synchronized (this) {
             // Synchronize only the state update
             try {
+                // Get current occupants at the new position
+                List<Player> currentOccupants = players.stream()
+                    .filter(p -> !p.equals(player) && p.getPosition().equals(newPosition))
+                    .toList();
+
+                // Check if the move is valid according to the occupancy strategy
+                if (!board.canMoveToPosition(newPosition, currentOccupants, player)) {
+                    return false;
+                }
+
+                // Update position
                 player.setPosition(newPosition);
 
+                // Check if this is a winning position
                 if (board.isWinningPosition(newPosition)) {
                     state = state.end();
                 } else {
@@ -60,5 +73,4 @@ public class Game {
                 .findFirst()
                 .orElseThrow(() -> new GameException.PlayerNotFound(playerId));
     }
-
 }

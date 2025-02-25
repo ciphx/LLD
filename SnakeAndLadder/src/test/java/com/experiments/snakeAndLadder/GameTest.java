@@ -34,6 +34,9 @@ class GameTest {
         // Initialize players' positions to start position
         players.forEach(player -> player.setPosition(new Position(0)));
         game = new Game("test-game", board, players, dice);
+
+        // Default mock behavior for canMoveToPosition
+        when(board.canMoveToPosition(any(), any(), any())).thenReturn(true);
     }
 
     @Test
@@ -42,9 +45,22 @@ class GameTest {
         Position newPosition = new Position(4);
         when(dice.roll()).thenReturn(4);
         when(board.getNextPosition(eq(startPosition), eq(4))).thenReturn(newPosition);
+        when(board.canMoveToPosition(eq(newPosition), any(), eq(players.getFirst()))).thenReturn(true);
         
         assertTrue(game.makeMove(0));
         assertEquals(4, players.getFirst().getPosition().value());
+    }
+
+    @Test
+    void makeMove_OccupiedPosition_Fails() {
+        Position startPosition = new Position(0);
+        Position newPosition = new Position(4);
+        when(dice.roll()).thenReturn(4);
+        when(board.getNextPosition(eq(startPosition), eq(4))).thenReturn(newPosition);
+        when(board.canMoveToPosition(eq(newPosition), any(), eq(players.getFirst()))).thenReturn(false);
+        
+        assertFalse(game.makeMove(0));
+        assertEquals(0, players.getFirst().getPosition().value());
     }
 
     @Test
@@ -54,6 +70,7 @@ class GameTest {
         when(dice.roll()).thenReturn(6);
         when(board.getNextPosition(eq(startPosition), eq(6))).thenReturn(winPosition);
         when(board.isWinningPosition(winPosition)).thenReturn(true);
+        when(board.canMoveToPosition(eq(winPosition), any(), eq(players.getFirst()))).thenReturn(true);
         
         assertTrue(game.makeMove(0));
         assertTrue(game.getState().isEnded());
@@ -71,6 +88,7 @@ class GameTest {
         when(dice.roll()).thenReturn(6);
         when(board.getNextPosition(any(), eq(6))).thenReturn(winPosition);
         when(board.isWinningPosition(winPosition)).thenReturn(true);
+        when(board.canMoveToPosition(eq(winPosition), any(), any())).thenReturn(true);
         game.makeMove(0);
         
         // Now try to make another move
@@ -83,6 +101,7 @@ class GameTest {
         Position snakePosition = new Position(2);
         when(dice.roll()).thenReturn(4);
         when(board.getNextPosition(eq(startPosition), eq(4))).thenReturn(snakePosition);
+        when(board.canMoveToPosition(eq(snakePosition), any(), eq(players.getFirst()))).thenReturn(true);
         
         assertTrue(game.makeMove(0));
         assertEquals(2, players.getFirst().getPosition().value());
@@ -94,6 +113,7 @@ class GameTest {
         Position ladderPosition = new Position(8);
         when(dice.roll()).thenReturn(2);
         when(board.getNextPosition(eq(startPosition), eq(2))).thenReturn(ladderPosition);
+        when(board.canMoveToPosition(eq(ladderPosition), any(), eq(players.getFirst()))).thenReturn(true);
         
         assertTrue(game.makeMove(0));
         assertEquals(8, players.getFirst().getPosition().value());
@@ -106,6 +126,7 @@ class GameTest {
         
         when(dice.roll()).thenReturn(6);
         when(board.getNextPosition(eq(currentPos), eq(6))).thenReturn(currentPos);
+        when(board.canMoveToPosition(eq(currentPos), any(), eq(players.getFirst()))).thenReturn(true);
         
         assertTrue(game.makeMove(0));
         assertEquals(96, players.getFirst().getPosition().value());

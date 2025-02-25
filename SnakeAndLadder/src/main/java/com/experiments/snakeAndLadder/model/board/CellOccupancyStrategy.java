@@ -7,5 +7,4 @@ import com.experiments.snakeAndLadder.model.Position;
 
 public interface CellOccupancyStrategy {
     boolean canOccupyCell(Position position, List<Player> currentOccupants, Player newPlayer);
-    boolean isOccupied(Position position);
-} 
+}
